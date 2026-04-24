@@ -115,7 +115,7 @@ def main():
 
     # Up to 20 attempts, 25s apart — fits within a 9-min job timeout
     MAX_ATTEMPTS = 20
-    SLEEP_SECONDS = 60
+    SLEEP_SECONDS = 90
 
     print(f"\nTrying up to {MAX_ATTEMPTS} attempt(s) across {len(ads)} AD(s)...\n")
 
