@@ -1,0 +1,39 @@
+name: Oracle A1.Flex Auto-Retry
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  create-instance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install OCI SDK
+        run: pip install oci
+
+      - name: Write OCI private key
+        run: |
+          mkdir -p ~/.oci
+          echo "${{ secrets.OCI_PRIVATE_KEY }}" > ~/.oci/oci_api_key.pem
+          chmod 600 ~/.oci/oci_api_key.pem
+
+      - name: Run retry script
+        env:
+          OCI_USER:        ${{ secrets.OCI_USER }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_TENANCY:     ${{ secrets.OCI_TENANCY }}
+          COMPARTMENT_ID:  ${{ secrets.COMPARTMENT_ID }}
+          SUBNET_ID:       ${{ secrets.SUBNET_ID }}
+          SSH_PUBLIC_KEY:  ${{ secrets.SSH_PUBLIC_KEY }}
+        run: python oracle_retry.py
