@@ -91,7 +91,7 @@ def main():
     print("="*60 + "\n")
 
     try:
-        compute  = oci.compute.ComputeClient(config)
+        compute  = oci.core.ComputeClient(config)
         identity = oci.identity.IdentityClient(config)
     except Exception as e:
         print(f"❌ OCI init failed: {e}")
