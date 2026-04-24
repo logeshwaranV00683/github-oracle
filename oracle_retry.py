@@ -62,7 +62,7 @@ def get_availability_domains(identity):
         return names
     except Exception as e:
         print(f"⚠️  AD fetch failed: {e}")
-        return ["SBqE:AP-HYDERABAD-1-AD-1"]
+        return ["jhTQ:AP-HYDERABAD-1-AD-1"]
 
 def build_instance(ad, image_id):
     return oci.core.models.LaunchInstanceDetails(
@@ -113,11 +113,18 @@ def main():
 
     ads = get_availability_domains(identity)
 
-    print(f"\nTrying {len(ads)} AD(s) this run...\n")
+    # Up to 20 attempts, 25s apart — fits within a 9-min job timeout
+    MAX_ATTEMPTS = 20
+    SLEEP_SECONDS = 25
 
-    for attempt, ad in enumerate(ads * 2, 1):
+    print(f"\nTrying up to {MAX_ATTEMPTS} attempt(s) across {len(ads)} AD(s)...\n")
+
+    for attempt, ad in enumerate(ads * MAX_ATTEMPTS, 1):
+        if attempt > MAX_ATTEMPTS:
+            break
+
         ts = datetime.utcnow().strftime('%H:%M:%S')
-        print(f"[{ts}] Try {attempt} → {ad}", end="  ", flush=True)
+        print(f"[{ts}] Try {attempt}/{MAX_ATTEMPTS} → {ad}", end="  ", flush=True)
 
         try:
             resp = compute.launch_instance(build_instance(ad, image_id))
@@ -157,10 +164,10 @@ def main():
             else:
                 print(f"⚠️  {msg[:100]}")
 
-        time.sleep(10)
+        time.sleep(SLEEP_SECONDS)
 
     print("\n⏳ All ADs at capacity this run.")
-    print("GitHub Actions will retry in 10 minutes automatically.")
+    print("GitHub Actions will retry in 5 minutes automatically.")
     sys.exit(0)
 
 if __name__ == "__main__":
