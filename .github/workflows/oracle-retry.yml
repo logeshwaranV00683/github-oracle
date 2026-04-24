@@ -2,13 +2,13 @@ name: Oracle A1.Flex Auto-Retry
 
 on:
   schedule:
-    - cron: '*/5 * * * *'   # Every 10 minutes, 24/7
+    - cron: '*/10 * * * *'   # Every 10 minutes, 24/7
   workflow_dispatch:           # Manual trigger from GitHub UI anytime
 
 jobs:
   create-instance:
     runs-on: ubuntu-latest
-    timeout-minutes: 4         # Safety — stop before next 10min trigger
+    timeout-minutes: 8         # Safety — stop before next 10min trigger
 
     steps:
       - name: Checkout
