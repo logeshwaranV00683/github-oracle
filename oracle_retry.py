@@ -5,178 +5,164 @@ import time
 from datetime import datetime
 
 # ================================================================
-# Values come from GitHub Secrets — no hardcoding needed
+# All values come from GitHub Secrets — nothing hardcoded
 # ================================================================
 
-USER_OCID      = os.environ["USER_OCID"]
-FINGERPRINT    = os.environ["FINGERPRINT"]
-TENANCY_OCID   = os.environ["TENANCY_OCID"]
-COMPARTMENT_ID = os.environ["COMPARTMENT_ID"]
-SUBNET_ID      = os.environ["SUBNET_ID"]
-IMAGE_ID       = os.environ["IMAGE_ID"]
-SSH_PUBLIC_KEY = os.environ["SSH_PUBLIC_KEY"]
-KEY_FILE       = os.path.expanduser("~/.oci/oci_api_key.pem")
-REGION         = "ap-mumbai-1"
-
-# All 3 ADs — tries each one automatically
-AVAILABILITY_DOMAINS = [
-    "GrCH:AP-MUMBAI-1-AD-1",
-    "GrCH:AP-MUMBAI-1-AD-2",
-    "GrCH:AP-MUMBAI-1-AD-3",
-]
-
 config = {
-    "user":        USER_OCID,
-    "key_file":    KEY_FILE,
-    "fingerprint": FINGERPRINT,
-    "tenancy":     TENANCY_OCID,
-    "region":      REGION,
+    "user":        os.environ["OCI_USER"],
+    "fingerprint": os.environ["OCI_FINGERPRINT"],
+    "tenancy":     os.environ["OCI_TENANCY"],
+    "region":      "ap-hyderabad-1",
+    "key_file":    os.path.expanduser("~/.oci/oci_api_key.pem"),
 }
 
-def print_banner():
-    print("\n" + "="*60)
-    print("  CoreCompass — Oracle A1.Flex GitHub Actions Retry")
-    print("="*60)
-    print(f"  Region : {REGION}")
-    print(f"  Shape  : VM.Standard.A1.Flex (4 OCPU / 24 GB)")
-    print(f"  Time   : {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC")
-    print("="*60 + "\n")
+COMPARTMENT_ID = os.environ["COMPARTMENT_ID"]
+SUBNET_ID      = os.environ["SUBNET_ID"]
+SSH_PUBLIC_KEY = os.environ["SSH_PUBLIC_KEY"]
 
-def test_connection(compute):
-    print("Testing OCI connection...", end=" ", flush=True)
+# ================================================================
+# AUTO-DETECT — image OCID and ADs fetched automatically
+# ================================================================
+
+def get_latest_ubuntu_arm_image(compute):
+    print("🔍 Finding latest Ubuntu 22.04 ARM image...", flush=True)
     try:
-        compute.list_shapes(COMPARTMENT_ID)
-        print("✅ Connected!\n")
-        return True
-    except oci.exceptions.ServiceError as e:
-        print(f"\n❌ Connection failed!")
-        msg = str(e)
-        if "401" in msg or "NotAuthenticated" in msg:
-            print("   → Check FINGERPRINT and OCI_PRIVATE_KEY secrets")
-        elif "NotAuthorizedOrNotFound" in msg:
-            print("   → Check USER_OCID and TENANCY_OCID secrets")
-        else:
-            print(f"   → {msg[:200]}")
-        return False
+        images = oci.pagination.list_call_get_all_results(
+            compute.list_images,
+            COMPARTMENT_ID,
+            operating_system="Canonical Ubuntu",
+            operating_system_version="22.04",
+            shape="VM.Standard.A1.Flex",
+            sort_by="TIMECREATED",
+            sort_order="DESC",
+        ).data
 
-def build_instance_details(availability_domain):
+        arm_images = [
+            img for img in images
+            if "aarch64" in img.display_name.lower()
+            and img.lifecycle_state == "AVAILABLE"
+        ]
+
+        if arm_images:
+            img = arm_images[0]
+            print(f"   ✅ {img.display_name}")
+            return img.id
+        else:
+            print("   ❌ No ARM image found!")
+            return None
+    except Exception as e:
+        print(f"   ❌ Error: {e}")
+        return None
+
+def get_availability_domains(identity):
+    try:
+        ads = identity.list_availability_domains(COMPARTMENT_ID).data
+        names = [ad.name for ad in ads]
+        print(f"📍 ADs: {names}")
+        return names
+    except Exception as e:
+        print(f"⚠️  AD fetch failed: {e}")
+        return ["SBqE:AP-HYDERABAD-1-AD-1"]
+
+def build_instance(ad, image_id):
     return oci.core.models.LaunchInstanceDetails(
-        availability_domain = availability_domain,
+        availability_domain = ad,
         compartment_id      = COMPARTMENT_ID,
         display_name        = "corecompass-prod",
         shape               = "VM.Standard.A1.Flex",
         shape_config        = oci.core.models.LaunchInstanceShapeConfigDetails(
-            ocpus         = 4,
-            memory_in_gbs = 24,
+            ocpus=4, memory_in_gbs=24,
         ),
         source_details = oci.core.models.InstanceSourceViaImageDetails(
-            image_id    = IMAGE_ID,
-            source_type = "image",
+            image_id=image_id, source_type="image",
         ),
-        # Uses YOUR existing VCN subnet
         create_vnic_details = oci.core.models.CreateVnicDetails(
             subnet_id        = SUBNET_ID,
             assign_public_ip = True,
-            display_name     = "corecompass-vnic",
             hostname_label   = "corecompass-prod",
         ),
-        metadata = {
-            "ssh_authorized_keys": SSH_PUBLIC_KEY,
-        },
+        metadata={"ssh_authorized_keys": SSH_PUBLIC_KEY},
     )
 
-def print_success(instance):
+def main():
     print("\n" + "="*60)
-    print("  🎉🎉🎉  INSTANCE CREATED SUCCESSFULLY!  🎉🎉🎉")
-    print("="*60)
-    print(f"  Name   : {instance.display_name}")
-    print(f"  OCID   : {instance.id}")
-    print(f"  AD     : {instance.availability_domain}")
-    print(f"  Status : {instance.lifecycle_state}")
-    print("="*60)
-    print("\n  Next Steps:")
-    print("  1. Go to Oracle Console → Compute → Instances")
-    print("  2. Find 'corecompass-prod' → wait for RUNNING status")
-    print("  3. Copy the Public IP Address")
-    print("  4. SSH: ssh -i your-key.pem ubuntu@<PUBLIC_IP>")
-    print("  5. Run: docker compose up --build -d")
+    print("  CoreCompass — Oracle A1.Flex GitHub Actions Retry")
+    print(f"  Time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC")
     print("="*60 + "\n")
 
-def main():
-    print_banner()
-
-    # Init OCI compute client
     try:
-        compute = oci.compute.ComputeClient(config)
+        compute  = oci.compute.ComputeClient(config)
+        identity = oci.identity.IdentityClient(config)
     except Exception as e:
-        print(f"❌ Failed to init OCI client: {e}")
+        print(f"❌ OCI init failed: {e}")
         sys.exit(1)
 
-    # Test connection first
-    if not test_connection(compute):
+    # Test connection
+    print("Testing connection...", end=" ", flush=True)
+    try:
+        compute.list_shapes(COMPARTMENT_ID)
+        print("✅\n")
+    except oci.exceptions.ServiceError as e:
+        print(f"❌\nError: {str(e)[:300]}")
         sys.exit(1)
 
-    # Try all 3 ADs once per GitHub Actions run
-    # (GitHub Actions runs every 10 minutes, so we try 3 ADs per run)
-    print("Trying all Availability Domains this run:\n")
+    # Auto-detect image + ADs
+    image_id = get_latest_ubuntu_arm_image(compute)
+    if not image_id:
+        sys.exit(1)
 
-    for i, ad in enumerate(AVAILABILITY_DOMAINS, 1):
-        timestamp = datetime.now().strftime('%H:%M:%S')
-        print(f"[{timestamp}] Try {i}/3 → {ad}", end="  ", flush=True)
+    ads      = get_availability_domains(identity)
+    ad_index = 0
 
-        instance_details = build_instance_details(ad)
+    print(f"\nTrying {len(ads)} AD(s) this run...\n")
+
+    for attempt, ad in enumerate(ads * 2, 1):  # try each AD twice per run
+        ts = datetime.utcnow().strftime('%H:%M:%S')
+        print(f"[{ts}] Try {attempt} → {ad}", end="  ", flush=True)
 
         try:
-            response = compute.launch_instance(instance_details)
-            print("✅ SUCCESS!")
-            print_success(response.data)
-            sys.exit(0)  # Exit success — GitHub Actions marks run as ✅
+            resp = compute.launch_instance(build_instance(ad, image_id))
+            inst = resp.data
+            print("✅ SUCCESS!\n")
+            print("="*60)
+            print("🎉🎉🎉  INSTANCE CREATED!  🎉🎉🎉")
+            print("="*60)
+            print(f"Name   : {inst.display_name}")
+            print(f"OCID   : {inst.id}")
+            print(f"AD     : {inst.availability_domain}")
+            print(f"Status : {inst.lifecycle_state}")
+            print("="*60)
+            print("→ Go to Oracle Console → Compute → Instances")
+            print("→ Wait for RUNNING status (~2 min)")
+            print("→ Copy Public IP → SSH in → Deploy!")
+            print("="*60)
+            sys.exit(0)
 
         except oci.exceptions.ServiceError as e:
             msg = str(e)
-
-            if any(x in msg for x in ["Out of host capacity", "InternalError", "capacity"]):
+            if any(x in msg for x in ["Out of host capacity", "capacity", "InternalError"]):
                 print("❌ No capacity")
-                if i < 3:
-                    time.sleep(5)  # small pause between ADs
-                continue
-
             elif "LimitExceeded" in msg:
-                print(f"\n⛔ Free tier limit reached!")
-                print("   You may already have an A1.Flex instance running.")
-                print("   Check Oracle Console → Compute → Instances")
-                sys.exit(0)  # Not an error, instance probably exists
-
-            elif "Conflict" in msg or "already exists" in msg.lower():
-                print(f"\n⚠️  Instance 'corecompass-prod' already exists!")
-                print("   Check Oracle Console → Compute → Instances")
+                print("\n⚠️  Free tier limit reached — may already have instance!")
                 sys.exit(0)
-
-            elif "NotAuthorizedOrNotFound" in msg:
-                print(f"\n⛔ Auth error — check your GitHub Secrets")
-                print(f"   {msg[:200]}")
+            elif "Conflict" in msg or "already exists" in msg.lower():
+                print("\n⚠️  Instance already exists! Check Oracle Console.")
+                sys.exit(0)
+            elif "NotAuthorized" in msg:
+                print(f"\n⛔ Auth error — check GitHub Secrets")
                 sys.exit(1)
-
             elif "InvalidParameter" in msg:
-                print(f"\n⛔ Bad config — check IMAGE_ID or SUBNET_ID secret")
-                print(f"   {msg[:200]}")
+                print(f"\n⛔ Bad param — check SUBNET_ID secret")
+                print(msg[:200])
                 sys.exit(1)
-
             else:
                 print(f"⚠️  {msg[:100]}")
-                continue
 
-        except Exception as e:
-            print(f"⚠️  {str(e)[:100]}")
-            continue
+        time.sleep(10)
 
-    # All 3 ADs tried — no capacity this run
-    print("\n" + "-"*60)
-    print("  All 3 ADs are at capacity right now.")
-    print("  GitHub Actions will retry automatically in 10 minutes.")
-    print(f"  Next attempt: ~{datetime.now().strftime('%H:%M')} + 10 min")
-    print("-"*60 + "\n")
-    sys.exit(0)  # Exit success — workflow will retry on next schedule
+    print("\n⏳ All ADs at capacity this run.")
+    print("GitHub Actions will retry in 10 minutes automatically.")
+    sys.exit(0)
 
 if __name__ == "__main__":
     main()

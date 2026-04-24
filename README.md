@@ -1,27 +1,18 @@
-# Oracle A1.Flex Auto-Retry
+# Oracle A1.Flex Auto-Retry via GitHub Actions
 
-Automatically tries to create Oracle Cloud A1.Flex instance every 10 minutes via GitHub Actions — no PC needed!
+PC off aanalum every 10 minutes automatically try pannும்!
 
-## Setup (5 minutes)
+---
 
-### Step 1 — Add GitHub Secrets
+## Setup — 3 Steps Only
 
-Go to your GitHub repo → **Settings → Secrets and Variables → Actions → New repository secret**
+### Step 1 — GitHub repo create pannu
 
-Add these 7 secrets:
+```
+github.com → New repository → Name: oracle-retry → Public → Create
+```
 
-| Secret Name | Where to get it |
-|---|---|
-| `USER_OCID` | Oracle Console → Profile icon → My Profile → OCID |
-| `FINGERPRINT` | Profile → My Profile → API Keys → Add API Key → copy fingerprint from preview |
-| `OCI_PRIVATE_KEY` | The downloaded `.pem` file content — open in Notepad, copy ALL text |
-| `TENANCY_OCID` | Profile → click Tenancy name → copy OCID |
-| `COMPARTMENT_ID` | Identity & Security → Compartments → root → copy OCID |
-| `SUBNET_ID` | Networking → VCN → core compass → corecompass-subnet → copy OCID |
-| `IMAGE_ID` | Compute → Create Instance → Change Image → Ubuntu 22.04 → aarch64 → copy OCID |
-| `SSH_PUBLIC_KEY` | Your id_rsa.pub file content (entire line starting with ssh-rsa...) |
-
-### Step 2 — Push to GitHub
+### Step 2 — These files push pannu
 
 ```bash
 git init
@@ -31,23 +22,26 @@ git remote add origin https://github.com/YOUR_USERNAME/oracle-retry.git
 git push -u origin main
 ```
 
-### Step 3 — Enable Actions
+### Step 3 — GitHub Secrets add pannu
 
-GitHub repo → **Actions tab** → Enable workflows if prompted
+**Repo → Settings → Secrets and Variables → Actions → New repository secret**
 
-### Step 4 — Watch it run
+Add these 6 secrets exactly:
 
-GitHub repo → **Actions tab** → See every run
+| Secret Name | Value |
+|---|---|
+| `OCI_USER` | `ocid1.user.oc1..aaaaaaaaphruty4hazbop2vyof6titcstvldwcw6p6fwvuwgnl63kesluroa` |
+| `OCI_FINGERPRINT` | `17:95:df:63:d8:6d:b5:9c:e3:1c:de:af:94:d5:74:9b` |
+| `OCI_TENANCY` | `ocid1.tenancy.oc1..aaaaaaaabi6jpiihh24imbmlhbe7abqzxikp4gn3lki2txscr7h7vxsayq3a` |
+| `OCI_PRIVATE_KEY` | Your .pem file — open in Notepad, copy ENTIRE content including -----BEGIN----- and -----END----- lines |
+| `COMPARTMENT_ID` | Oracle Console → Identity → Compartments → root → copy OCID |
+| `SUBNET_ID` | Networking → VCN → core compass → corecompass-subnet → copy OCID |
+| `SSH_PUBLIC_KEY` | Contents of id_rsa.pub file (run: cat ~/.ssh/id_rsa.pub) |
 
-When instance is created you'll see **🎉 SUCCESS** in the logs!
+### Done!
 
-## How it works
+GitHub Actions → oracle-retry.yml → runs every 10 minutes.
 
-- Runs every 10 minutes automatically (via GitHub cron)
-- Tries all 3 Availability Domains per run
-- Stops automatically when instance is created
-- Completely free — GitHub Actions free tier = 2000 min/month
+When SUCCESS → check Actions logs for instance details.
 
-## To Stop (after instance is created)
-
-GitHub repo → **Actions → oracle-retry.yml → Disable workflow**
+Then disable the workflow: Actions → oracle-retry.yml → Disable workflow
