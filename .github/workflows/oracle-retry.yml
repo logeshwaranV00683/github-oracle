@@ -1,0 +1,44 @@
+name: Oracle A1.Flex Auto-Retry
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'   # Every 10 minutes, 24/7
+  workflow_dispatch:           # Manual trigger from GitHub UI anytime
+
+jobs:
+  create-instance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9         # Safety — stop before next 10min trigger
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install OCI SDK
+        run: pip install oci
+
+      - name: Setup OCI Private Key
+        run: |
+          mkdir -p ~/.oci
+          echo "${{ secrets.OCI_PRIVATE_KEY }}" > ~/.oci/oci_api_key.pem
+          chmod 600 ~/.oci/oci_api_key.pem
+
+      - name: Run Oracle Retry Script
+        env:
+          USER_OCID:      ${{ secrets.USER_OCID }}
+          FINGERPRINT:    ${{ secrets.FINGERPRINT }}
+          TENANCY_OCID:   ${{ secrets.TENANCY_OCID }}
+          COMPARTMENT_ID: ${{ secrets.COMPARTMENT_ID }}
+          SUBNET_ID:      ${{ secrets.SUBNET_ID }}
+          IMAGE_ID:       ${{ secrets.IMAGE_ID }}
+          SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+        run: python oracle_retry.py
+
+      - name: Notify on Success
+        if: success()
+        run: echo "✅ Check logs above — if instance created, you'll see SUCCESS message"
