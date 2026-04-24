@@ -111,12 +111,11 @@ def main():
     if not image_id:
         sys.exit(1)
 
-    ads      = get_availability_domains(identity)
-    ad_index = 0
+    ads = get_availability_domains(identity)
 
     print(f"\nTrying {len(ads)} AD(s) this run...\n")
 
-    for attempt, ad in enumerate(ads * 2, 1):  # try each AD twice per run
+    for attempt, ad in enumerate(ads * 2, 1):
         ts = datetime.utcnow().strftime('%H:%M:%S')
         print(f"[{ts}] Try {attempt} → {ad}", end="  ", flush=True)
 
