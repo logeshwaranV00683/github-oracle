@@ -30,13 +30,12 @@ jobs:
 
       - name: Run Oracle Retry Script
         env:
-          USER_OCID:      ${{ secrets.USER_OCID }}
-          FINGERPRINT:    ${{ secrets.FINGERPRINT }}
-          TENANCY_OCID:   ${{ secrets.TENANCY_OCID }}
-          COMPARTMENT_ID: ${{ secrets.COMPARTMENT_ID }}
-          SUBNET_ID:      ${{ secrets.SUBNET_ID }}
-          IMAGE_ID:       ${{ secrets.IMAGE_ID }}
-          SSH_PUBLIC_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+          OCI_USER:        ${{ secrets.OCI_USER }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_TENANCY:     ${{ secrets.OCI_TENANCY }}
+          COMPARTMENT_ID:  ${{ secrets.COMPARTMENT_ID }}
+          SUBNET_ID:       ${{ secrets.SUBNET_ID }}
+          SSH_PUBLIC_KEY:  ${{ secrets.SSH_PUBLIC_KEY }}
         run: python oracle_retry.py
 
       - name: Notify on Success
