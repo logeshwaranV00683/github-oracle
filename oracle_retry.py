@@ -24,11 +24,13 @@ DISPLAY_NAME = "corecompass-prod"
 
 # Shape configs to try, in order, per attempt.
 # NOTE: Oracle cut the Always Free A1.Flex allowance from 4 OCPU/24GB to
-# 2 OCPU/12GB total, effective June 15, 2026 (undocumented change).
-# Requesting 4/24 on a free-tier account will now fail even with capacity
-# available, so we lead with the real current limit and fall back smaller
-# in case partial capacity is all that's free.
+# 2 OCPU/12GB total, effective June 15, 2026 (undocumented change, and
+# reports conflict on whether every account was affected). We still try
+# 4/24 first in case this account is grandfathered in — costs nothing but
+# one extra failed attempt if not — then fall back to the confirmed real
+# limits.
 SHAPE_CONFIGS = [
+    {"ocpus": 4, "memory_in_gbs": 24},
     {"ocpus": 2, "memory_in_gbs": 12},
     {"ocpus": 1, "memory_in_gbs": 6},
 ]
@@ -172,9 +174,10 @@ def main():
 
     ads = get_availability_domains(identity)
 
-    # Up to 20 attempts, 25s apart — fits within a 9-min job timeout
+    # Up to 20 attempts, 35s apart — fits within a 9-min job timeout, and
+    # spaced out enough to avoid tripping Oracle's rate limiter
     MAX_ATTEMPTS = 20
-    SLEEP_SECONDS = 25
+    SLEEP_SECONDS = 35
 
     print(f"\nTrying up to {MAX_ATTEMPTS} attempt(s) across {len(ads)} AD(s), "
           f"{len(SHAPE_CONFIGS)} shape size(s) each...\n")
@@ -200,7 +203,12 @@ def main():
 
                 except oci.exceptions.ServiceError as e:
                     msg = str(e)
-                    if any(x in msg for x in ["Out of host capacity", "capacity", "InternalError"]):
+                    if getattr(e, "status", None) == 429 or "TooManyRequests" in msg:
+                        backoff = 60
+                        print(f"🐢 Rate limited — backing off {backoff}s before next try")
+                        time.sleep(backoff)
+                        continue
+                    elif any(x in msg for x in ["Out of host capacity", "capacity", "InternalError"]):
                         print("❌ No capacity")
                     elif "LimitExceeded" in msg:
                         # Don't trust this label — verify against reality before giving up.
