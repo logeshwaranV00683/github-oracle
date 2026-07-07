@@ -174,7 +174,7 @@ def main():
     # Up to 20 attempts, 35s apart — fits within a 9-min job timeout, and
     # spaced out enough to avoid tripping Oracle's rate limiter
     MAX_ATTEMPTS = 20
-    SLEEP_SECONDS = 35
+    SLEEP_SECONDS = 90
 
     print(f"\nTrying up to {MAX_ATTEMPTS} attempt(s) across {len(ads)} AD(s), "
           f"{len(SHAPE_CONFIGS)} shape size(s) each...\n")
